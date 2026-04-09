@@ -1,123 +1,118 @@
-[![Netlify Status](https://api.netlify.com/api/v1/badges/npm-hat-cms/deploy-status)](https://app.netlify.com/sites/npm-hat-cms/deploys)
-
 # npm-HAT-CMS
 
-A custom CMS to help manage the [npm-HAT](https://github.com/SummittDweller/npm-HAT) (Hometown Action Team) website. This project is patterned after the [wieting-one-click-hugo-cms](https://github.com/SummittDweller/wieting-one-click-hugo-cms) project in the same GitHub account.
+This repository now follows the same core pattern as `../Wieting-Website-CMS`:
 
-## Overview
+- the CMS is a local application,
+- the Hugo site is edited on disk,
+- the built site is static output,
+- deployment is handled by AWS Amplify from repository source.
 
-This repository provides a [Netlify CMS](https://www.netlifycms.org/) (Decap CMS) interface for managing content in the [SummittDweller/npm-HAT](https://github.com/SummittDweller/npm-HAT) Hugo website. It uses [Victor Hugo](https://github.com/netlify/victor-hugo) as the underlying build system (webpack + Hugo).
+Netlify and the browser-based Decap admin have been removed from this project.
 
-### Managed Content Types
+## What Changed
 
-The CMS provides editing interfaces for the following content types in the npm-HAT project:
+The old approach depended on a hosted CMS UI and GitHub authentication flow. That made deployment and content editing tightly coupled to a platform-specific setup.
 
-| Collection | Folder | Description |
-|---|---|---|
-| **Events** | `content/event` | HAT steering committee meetings and other events |
-| **Posts** | `content/post` | General news and announcements |
-| **Plans** | `content/plan` | Community planning documents and concept overviews |
-| **Documents** | `content/document` | Meeting minutes and reference documents |
-| **Education** | `content/education` | Educational content (e.g. RRFB guides) |
-| **Let's Moove** | `content/moove` | Let's Moove / Connect Tama-Toledo project pages |
-| **Main Pages** | `content/` | Top-level pages: About, Calendar, Contact |
+The new approach is local-first:
 
-## Getting Started
+- `main.py` is a local Flet CMS app
+- `cms_core.py` handles frontmatter generation and file naming
+- `run.sh` creates a virtual environment and launches the CMS
+- Hugo content is written directly into `site/content`
+- `npm run build` still produces the deployable static site in `dist/`
+- AWS Amplify can rebuild and publish this repository directly from source on each push
 
-### Prerequisites
+## Prerequisites
 
-- Node.js 12+ (see `.nvmrc`)
-- Hugo (installed via `hugo-bin` npm package)
-- A GitHub account with access to the [SummittDweller/npm-HAT](https://github.com/SummittDweller/npm-HAT) repository
-- A [Netlify](https://www.netlify.com/) account (for deployment and authentication)
+- Node.js 12+
+- Python 3.9+
+- npm dependencies installed with `npm install`
 
-### Local Development
-
-Clone this repository and install dependencies:
+## Install
 
 ```bash
-git clone https://github.com/SummittDweller/npm-HAT-CMS.git
-cd npm-HAT-CMS
 npm install
 ```
 
-Then start the development server:
+The Python CMS dependencies are installed automatically the first time you run the launcher.
+
+## Run The CMS
 
 ```bash
-npm start
+./run.sh
 ```
 
-For local CMS editing (without deploying to Netlify), run the Netlify CMS proxy server in a separate terminal:
+The app opens a local content editor that writes markdown files directly into the Hugo site.
 
-```bash
-npx netlify-cms-proxy-server
-```
-
-Then set `local_backend: true` in `site/static/admin/config.yml`.
-
-### Building for Production
+## Build The Site
 
 ```bash
 npm run build
 ```
 
-The built site will be in the `dist/` directory.
+The built site is written to `dist/`. In production, AWS Amplify should generate that output from repository source on each push.
 
-## Deployment
+## Default Workflow
 
-This project is designed to be deployed on [Netlify](https://www.netlify.com/). The `netlify.toml` file configures the build command and publish directory.
+1. Run `./run.sh`.
+2. Create or update content in the local CMS app.
+3. Save entries into `site/content`.
+4. Run `npm run build`.
+5. Commit and push your changes.
+6. Let AWS Amplify rebuild and publish the site.
 
-### Netlify Setup
+## AWS Deployment
 
-1. Connect the repository to Netlify
-2. Enable **Netlify Identity** on your Netlify site (Site Settings → Identity → Enable Identity)
-3. Under **Identity → Services → Git Gateway**, enable Git Gateway
-4. The CMS will be available at `https://your-site.netlify.app/admin/`
+This repository is configured for source-driven AWS Amplify deployment.
 
-### Backend Configuration
+- Amplify config: [amplify.yml](/Users/mark/GitHub/npm-HAT-CMS/amplify.yml)
+- Deployment flow: [DEPLOYMENT_FLOW.md](/Users/mark/GitHub/npm-HAT-CMS/DEPLOYMENT_FLOW.md)
+- Setup guide: [DEPLOYMENT.md](/Users/mark/GitHub/npm-HAT-CMS/DEPLOYMENT.md)
 
-The CMS backend is configured in `site/static/admin/config.yml`. By default it uses the `github` backend pointing directly to the `SummittDweller/npm-HAT` repository:
+Amplify should run `npm ci`, then `npm run build`, then publish `dist/`.
 
-```yaml
-backend:
-  name: github
-  repo: SummittDweller/npm-HAT
-  branch: main
+## Alternate Site Root
+
+The CMS defaults to this repository's local Hugo site at `./site`.
+
+If you still want to write directly into another Hugo repository, such as `../npm-HAT`, change the `Hugo Site Root` field in the app. The CMS will then write content into that target site instead.
+
+That lets you use this repository as a local editor even if the real site source remains elsewhere.
+
+## Supported Content Types
+
+The local CMS currently supports these content targets:
+
+- Events
+- Posts
+- Plans
+- Documents
+- Education
+- Let's Moove page
+- About page
+- Calendar page
+- Contact page
+
+Folder-based content types generate filenames automatically from title and date data. Fixed pages write directly to their known markdown file path.
+
+## Files
+
+- `main.py` - Flet desktop-style CMS application
+- `cms_core.py` - shared content definitions and markdown generation logic
+- `run.sh` - local launcher
+- `python-requirements.txt` - Python dependencies for the CMS app
+- `site/` - Hugo site source
+- `dist/` - generated static output after build and the artifact Amplify publishes
+
+## Test
+
+```bash
+python -m unittest test_cms_core.py
 ```
 
-Alternatively, if you add npm-HAT as a git subtree under `site/`, you can switch to the `git-gateway` backend (see comments in `config.yml`).
+## Notes
 
-## Project Structure
-
-```
-npm-HAT-CMS/
-├── .babelrc              # Babel configuration
-├── .eslintrc.yml         # ESLint configuration
-├── .gitignore
-├── .nvmrc                # Node.js version (12)
-├── netlify.toml          # Netlify build configuration
-├── package.json          # npm scripts and dependencies
-├── postcss.config.js     # PostCSS configuration
-├── webpack.common.js     # Shared webpack config
-├── webpack.dev.js        # Development webpack config
-├── webpack.prod.js       # Production webpack config
-├── src/
-│   ├── cms.html          # CMS HTML entry template
-│   ├── index.js          # Main JS entry point
-│   ├── css/
-│   │   └── main.css      # Main stylesheet
-│   └── js/
-│       └── cms.js        # Netlify CMS initialization
-└── site/                 # Hugo site
-    ├── config.toml       # Hugo configuration
-    └── static/
-        └── admin/
-            ├── index.html    # CMS admin page
-            └── config.yml    # CMS collections configuration
-```
-
-## Related Projects
-
-- [npm-HAT](https://github.com/SummittDweller/npm-HAT) — The Hugo website this CMS manages
-- [wieting-one-click-hugo-cms](https://github.com/SummittDweller/wieting-one-click-hugo-cms) — The template project this CMS is patterned after
-
+- The app is intentionally local and file-based. There is no hosted auth flow.
+- `npm run build` remains the canonical local verification step for the deployable site output.
+- In production, AWS Amplify should rebuild from source instead of consuming files manually uploaded from a local machine.
+- If you point the CMS at a different site root, that affects where content is written, not how this repository's own `npm run build` behaves.
