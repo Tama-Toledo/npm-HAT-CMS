@@ -1,0 +1,358 @@
+backend:
+  name: github
+  repo: SummittDweller/npm-HAT
+  branch: main
+
+## To use Netlify's git-gateway (when npm-HAT is added as a git subtree under site/):
+# backend:
+#   name: git-gateway
+#   branch: main
+
+## To make local_backend mode work you must run 'npx netlify-cms-proxy-server'
+##   from the project root, preferably in a 2nd terminal window.
+# local_backend: true
+
+media_folder: static/images
+public_folder: /images
+
+collections:
+
+## Events
+
+  - name: event
+    label: Events
+    folder: content/event
+    create: true
+    slug: '{{year}}-{{month}}-{{day}}_{{slug}}'
+    editor:
+      preview: true
+
+    sort: "publishDate:desc"
+    sortable_fields: [ 'publishDate', 'title' ]
+
+    view_groups:
+      - label: 'Year'
+        field: publishDate
+        pattern: \d{4}
+
+    fields:
+
+      - label: Title
+        name: title
+        widget: string
+        required: true
+
+      - label: Publish Date
+        name: publishDate
+        widget: datetime
+        picker_utc: false
+        required: true
+        hint: The date this event was published or first appeared on the site.
+
+      - label: Location
+        name: location
+        widget: string
+        required: false
+        hint: Where the event takes place.
+
+      - label: Expiry Date
+        name: expiryDate
+        widget: date
+        picker_utc: false
+        required: false
+        format: 'YYYY-MM-DD'
+        hint: The date after which this event should no longer display.
+
+      - label: Body
+        name: body
+        widget: markdown
+        required: false
+
+      - label: Draft?
+        name: draft
+        widget: boolean
+        default: false
+
+## Posts
+
+  - name: post
+    label: Posts
+    folder: content/post
+    create: true
+    slug: '{{slug}}'
+    editor:
+      preview: true
+
+    sort: "publishdate:desc"
+    sortable_fields: [ 'publishdate', 'title' ]
+
+    view_groups:
+      - label: 'Year'
+        field: publishdate
+        pattern: \d{4}
+
+    fields:
+
+      - label: Title
+        name: title
+        widget: string
+        required: true
+
+      - label: Publish Date
+        name: publishdate
+        widget: datetime
+        picker_utc: false
+        required: true
+
+      - label: Author
+        name: author
+        widget: string
+        required: false
+
+      - label: Tags
+        name: tags
+        widget: list
+        required: false
+        hint: Enter one or more tags, comma-separated.
+
+      - label: Categories
+        name: categories
+        widget: list
+        required: false
+
+      - label: Body
+        name: body
+        widget: markdown
+        required: false
+
+      - label: Draft?
+        name: draft
+        widget: boolean
+        default: false
+
+## Plans
+
+  - name: plan
+    label: Plans
+    folder: content/plan
+    create: true
+    slug: '{{slug}}'
+    editor:
+      preview: true
+
+    sort: "weight:asc"
+    sortable_fields: [ 'weight', 'title', 'publishdate' ]
+
+    fields:
+
+      - label: Title
+        name: title
+        widget: string
+        required: true
+
+      - label: Publish Date
+        name: publishdate
+        widget: datetime
+        picker_utc: false
+        required: false
+
+      - label: Author
+        name: author
+        widget: string
+        required: false
+
+      - label: Tags
+        name: tags
+        widget: list
+        required: false
+
+      - label: Categories
+        name: categories
+        widget: list
+        required: false
+
+      - label: Weight
+        name: weight
+        widget: number
+        required: false
+        hint: Controls sort order; lower numbers appear first.
+
+      - label: Body
+        name: body
+        widget: markdown
+        required: false
+
+      - label: Draft?
+        name: draft
+        widget: boolean
+        default: false
+
+## Documents
+
+  - name: document
+    label: Documents
+    folder: content/document
+    create: true
+    slug: '{{year}}-{{month}}-{{day}}_{{slug}}'
+    editor:
+      preview: true
+
+    sort: "date:desc"
+    sortable_fields: [ 'date', 'title' ]
+
+    view_groups:
+      - label: 'Year'
+        field: date
+        pattern: \d{4}
+
+    fields:
+
+      - label: Title
+        name: title
+        widget: string
+        required: true
+
+      - label: Date
+        name: date
+        widget: date
+        picker_utc: false
+        required: true
+        format: 'YYYY-MM-DD'
+        hint: The date of this document or meeting.
+
+      - label: Body
+        name: body
+        widget: markdown
+        required: false
+        hint: You may embed a PDF using Hugo shortcodes or HTML embed tags.
+
+      - label: Draft?
+        name: draft
+        widget: boolean
+        default: false
+
+## Education
+
+  - name: education
+    label: Education
+    folder: content/education
+    create: true
+    slug: '{{slug}}'
+    editor:
+      preview: true
+
+    sort: "publishdate:desc"
+    sortable_fields: [ 'publishdate', 'title' ]
+
+    fields:
+
+      - label: Title
+        name: title
+        widget: string
+        required: true
+
+      - label: Publish Date
+        name: publishdate
+        widget: datetime
+        picker_utc: false
+        required: false
+
+      - label: Author
+        name: author
+        widget: string
+        required: false
+
+      - label: Tags
+        name: tags
+        widget: list
+        required: false
+
+      - label: Categories
+        name: categories
+        widget: list
+        required: false
+
+      - label: Body
+        name: body
+        widget: markdown
+        required: false
+
+      - label: Draft?
+        name: draft
+        widget: boolean
+        default: false
+
+## Let's Moove
+
+  - name: moove
+    label: "Let's Moove"
+    files:
+      - file: content/moove/_index.md
+        label: "Let's Moove Page"
+        name: moove-index
+        fields:
+          - label: Title
+            name: title
+            widget: string
+          - label: Author
+            name: author
+            widget: string
+            required: false
+          - label: Date
+            name: date
+            widget: date
+            required: false
+          - label: Body
+            name: body
+            widget: markdown
+            required: false
+
+## Main Pages
+
+  - name: pages
+    label: Main Pages
+    files:
+      - file: content/about.md
+        label: About Us
+        name: about
+        fields:
+          - label: Title
+            name: title
+            widget: string
+          - label: Date
+            name: date
+            widget: date
+            required: false
+          - label: Body
+            name: body
+            widget: markdown
+
+      - file: content/calendar.md
+        label: Calendar
+        name: calendar
+        fields:
+          - label: Title
+            name: title
+            widget: string
+          - label: Date
+            name: date
+            widget: date
+            required: false
+          - label: Body
+            name: body
+            widget: markdown
+
+      - file: content/contact.md
+        label: Contact
+        name: contact
+        fields:
+          - label: Title
+            name: title
+            widget: string
+          - label: Date
+            name: date
+            widget: date
+            required: false
+          - label: Body
+            name: body
+            widget: markdown
