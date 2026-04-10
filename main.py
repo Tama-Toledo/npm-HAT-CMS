@@ -1,18 +1,29 @@
 from pathlib import Path
+import os
+import re
 import shutil
 import socket
 import subprocess
 import sys
 import time
-from datetime import date, datetime, time as dt_time
+from datetime import date, datetime, time as dt_time, timedelta
+from urllib.parse import parse_qs, unquote, urlparse
 
 import flet as ft
+
+try:
+  from dotenv import load_dotenv
+except ImportError:
+  load_dotenv = None
 
 from cms_core import ENTRY_DEFINITIONS, build_pdf_asset_path, build_target_path, render_markdown, resolve_site_root, validate_values
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_SITE_ROOT = PROJECT_ROOT / "site"
+
+if load_dotenv is not None:
+  load_dotenv(PROJECT_ROOT / ".env")
 
 
 class HatCmsApp:
@@ -29,6 +40,10 @@ class HatCmsApp:
     self.local_site_server = None
     self.local_site_server_root = None
     self.local_site_url = ""
+    self.google_calendar_sync_enabled = os.getenv("GOOGLE_CALENDAR_SYNC_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}
+    self.google_calendar_timezone = os.getenv("GOOGLE_CALENDAR_TIMEZONE", "America/Chicago").strip() or "America/Chicago"
+    self.google_service_account_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", str(PROJECT_ROOT / "google-service-account.json")).strip()
+    self.google_calendar_id = self.detect_google_calendar_id()
 
     self.site_root_field = ft.TextField(
       label="Hugo Site Root",
@@ -89,11 +104,15 @@ class HatCmsApp:
     self._time_picker = ft.TimePicker(
       on_change=self._on_time_picker_change,
     )
+    self._simple_time_picker = ft.TimePicker(
+      on_change=self._on_simple_time_picker_change,
+    )
 
     self.build_form()
     self.page.add(self.build_layout())
     self.page.overlay.append(self._date_picker)
     self.page.overlay.append(self._time_picker)
+    self.page.overlay.append(self._simple_time_picker)
     self.refresh_preview()
 
   def build_layout(self):
@@ -184,6 +203,27 @@ class HatCmsApp:
     self.page.update()
 
   def make_control(self, field):
+    if field["type"] == "time":
+      default_value = str(field.get("default") or "00:00:00")
+      value_field = ft.TextField(
+        label=field["label"],
+        hint_text=field.get("hint"),
+        value=default_value,
+        expand=True,
+        read_only=True,
+      )
+      pick_button = ft.OutlinedButton(
+        "Pick Time",
+        on_click=lambda _event, field_name=field["name"]: self.handle_pick_time(field_name),
+      )
+      wrapper = ft.Row(
+        controls=[value_field, pick_button],
+        spacing=12,
+        vertical_alignment=ft.CrossAxisAlignment.END,
+        expand=True,
+      )
+      return wrapper, value_field
+
     if field["type"] == "boolean":
       control = ft.Checkbox(label=field["label"], value=bool(field.get("default", False)))
       return control, control
@@ -396,7 +436,19 @@ class HatCmsApp:
         target_path.write_text(content, encoding="utf-8")
         self.preview_field.value = content
 
-      self.set_status(f"Saved {target_path}", ft.Colors.GREEN_700)
+      status_message = f"Saved {target_path}"
+      status_color = ft.Colors.GREEN_700
+      if self.entry_dropdown.value == "event":
+        try:
+          sync_note = self.sync_event_to_google_calendar(values)
+          if sync_note:
+            status_message = f"{status_message} | {sync_note}"
+        except Exception as sync_error:
+          short_error = str(sync_error).splitlines()[0].strip()
+          status_message = f"{status_message} | Google Calendar sync failed: {short_error}"
+          status_color = ft.Colors.ORANGE_700
+
+      self.set_status(status_message, status_color)
     except Exception as error:
       self.set_status(str(error), ft.Colors.RED_700)
 
@@ -496,6 +548,144 @@ class HatCmsApp:
     )
     control.value = updated.isoformat()
     self.refresh_preview()
+
+  def handle_pick_time(self, field_name):
+    control = self.field_controls.get(field_name)
+    if not isinstance(control, ft.TextField):
+      return
+    try:
+      self._simple_time_picker.value = datetime.strptime((control.value or "").strip(), "%H:%M:%S").time()
+    except ValueError:
+      self._simple_time_picker.value = dt_time(0, 0, 0)
+    self._picker_target_field = field_name
+    self._simple_time_picker.open = True
+    self.page.update()
+
+  def _on_simple_time_picker_change(self, _event):
+    if self._simple_time_picker.value is None or self._picker_target_field is None:
+      return
+    control = self.field_controls.get(self._picker_target_field)
+    if not isinstance(control, ft.TextField):
+      return
+    selected = self._simple_time_picker.value
+    selected_time = selected.time() if isinstance(selected, datetime) else selected
+    control.value = selected_time.isoformat()
+    self.refresh_preview()
+
+  def detect_google_calendar_id(self):
+    configured = os.getenv("GOOGLE_CALENDAR_ID", "").strip()
+    if configured:
+      return configured
+
+    calendar_page = PROJECT_ROOT / "site" / "content" / "calendar.md"
+    if not calendar_page.exists():
+      return ""
+
+    text = calendar_page.read_text(encoding="utf-8")
+    iframe_matches = re.findall(r'https://calendar.google.com/calendar/embed\?[^"\']+', text)
+    if not iframe_matches:
+      return ""
+
+    for url in reversed(iframe_matches):
+      decoded_query = urlparse(url.replace("&amp;", "&")).query
+      params = parse_qs(decoded_query)
+      if params.get("src"):
+        return unquote(params["src"][0])
+
+    return ""
+
+  def parse_time_text(self, raw_text):
+    text = (raw_text or "").strip()
+    if not text:
+      return None
+
+    normalized = text.lower().replace(" ", "")
+    candidates = [
+      "%H:%M:%S",
+      "%H:%M",
+      "%I:%M%p",
+      "%I%p",
+      "%I:%M %p",
+      "%I %p",
+    ]
+    for fmt in candidates:
+      try:
+        return datetime.strptime(normalized if "%p" in fmt else text, fmt).time()
+      except ValueError:
+        continue
+
+    return None
+
+  def sync_event_to_google_calendar(self, values):
+    if not self.google_calendar_sync_enabled:
+      return "Google Calendar sync disabled in .env."
+
+    if not self.google_calendar_id:
+      raise ValueError("Missing GOOGLE_CALENDAR_ID and unable to detect one from site/content/calendar.md")
+
+    credentials_path = Path(self.google_service_account_file)
+    if not credentials_path.is_absolute():
+      credentials_path = PROJECT_ROOT / credentials_path
+    credentials_path = credentials_path.resolve()
+    if not credentials_path.exists():
+      raise ValueError(f"Missing Google service account file: {credentials_path}")
+
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
+    scopes = ["https://www.googleapis.com/auth/calendar.events"]
+    credentials = service_account.Credentials.from_service_account_file(str(credentials_path), scopes=scopes)
+    service = build("calendar", "v3", credentials=credentials, cache_discovery=False)
+
+    event_date_text = str(values.get("date") or "").strip()
+    if not event_date_text:
+      publish = str(values.get("publishDate") or "")
+      match = re.search(r"\d{4}-\d{2}-\d{2}", publish)
+      if match:
+        event_date_text = match.group(0)
+
+    if not event_date_text:
+      raise ValueError("Event date is required for Google Calendar sync")
+
+    event_date = datetime.strptime(event_date_text, "%Y-%m-%d").date()
+    start_time = self.parse_time_text(values.get("startTime"))
+    end_time = self.parse_time_text(values.get("endTime"))
+
+    event_payload = {
+      "summary": str(values.get("title") or "Untitled Event").strip() or "Untitled Event",
+      "location": str(values.get("location") or "").strip(),
+      "description": str(values.get("body") or "").strip(),
+      "status": "confirmed",
+    }
+
+    if start_time is None:
+      event_payload["start"] = {"date": event_date.isoformat()}
+      event_payload["end"] = {"date": (event_date + timedelta(days=1)).isoformat()}
+    else:
+      start_dt = datetime.combine(event_date, start_time)
+      if end_time is None:
+        end_dt = start_dt + timedelta(hours=1)
+      else:
+        end_dt = datetime.combine(event_date, end_time)
+        if end_dt <= start_dt:
+          end_dt = start_dt + timedelta(hours=1)
+
+      event_payload["start"] = {
+        "dateTime": start_dt.isoformat(),
+        "timeZone": self.google_calendar_timezone,
+      }
+      event_payload["end"] = {
+        "dateTime": end_dt.isoformat(),
+        "timeZone": self.google_calendar_timezone,
+      }
+
+    service.events().insert(
+      calendarId=self.google_calendar_id,
+      body=event_payload,
+      sendUpdates="none",
+    ).execute()
+
+    return "Google Calendar event created (confirmed)."
 
   def handle_clear(self, _event):
     for field_name, control in self.field_controls.items():

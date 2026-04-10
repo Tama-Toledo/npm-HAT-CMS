@@ -6,3 +6,5 @@ site/data/webpack.json
 yarn-error.log
 .venv
 __pycache__/
+.env
+google-service-account.json

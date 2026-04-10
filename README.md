@@ -140,6 +140,33 @@ Document entries support embedded PDF viewing:
 - Markdown content embeds the PDF via `<embed>` tag pointing to the relative path
 - On build, PDFs are included in `dist/pdfs/` for serving
 
+### Google Calendar Sync (Events)
+
+Event saves can now create a Google Calendar event automatically.
+
+- Sync target: the calendar currently embedded in `site/content/calendar.md` (auto-detected)
+- Event status in Google Calendar: `confirmed`
+- If `startTime` and `endTime` are provided, a timed event is created
+- If no start time is provided, an all-day event is created
+
+Create credentials (API key is not enough for event creation):
+
+1. Open Google Cloud Console and select/create a project.
+2. Enable the Google Calendar API.
+3. Create a Service Account and download its JSON key.
+4. Share your Google Calendar with the service account email address and grant “Make changes to events”.
+5. Place the JSON file at the project root as `google-service-account.json` (or set a custom path in `.env`).
+
+Environment variables are read from `.env`:
+
+```env
+GOOGLE_CALENDAR_SYNC_ENABLED=1
+GOOGLE_CALENDAR_TIMEZONE=America/Chicago
+GOOGLE_SERVICE_ACCOUNT_FILE=google-service-account.json
+# Optional override:
+# GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+```
+
 ### Font Awesome Icons
 
 The site includes Font Awesome 5.13.0 webfonts:

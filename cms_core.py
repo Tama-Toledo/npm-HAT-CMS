@@ -14,6 +14,9 @@ ENTRY_DEFINITIONS = {
     "fields": [
       {"name": "title", "label": "Title", "type": "string", "required": True},
       {"name": "publishDate", "label": "Publish Date", "type": "datetime", "required": True, "hint": "Example: 2026-04-08T10:30:00-05:00"},
+      {"name": "date", "label": "Event Date", "type": "date", "required": False, "hint": "Example: 2026-04-08"},
+      {"name": "startTime", "label": "Start Time", "type": "time", "required": False},
+      {"name": "endTime", "label": "End Time", "type": "time", "required": False},
       {"name": "location", "label": "Location", "type": "string", "required": False},
       {"name": "expiryDate", "label": "Expiry Date", "type": "date", "required": False, "hint": "Example: 2026-12-31"},
       {"name": "body", "label": "Body", "type": "markdown", "required": False, "store": False},

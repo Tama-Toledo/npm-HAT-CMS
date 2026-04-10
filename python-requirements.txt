@@ -1,2 +1,5 @@
 flet>=0.24.0
 pyyaml>=6.0
+google-api-python-client>=2.170.0
+google-auth>=2.40.0
+python-dotenv>=1.0.1
