@@ -4,6 +4,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import date, datetime, time as dt_time
 
 import flet as ft
 
@@ -24,6 +25,7 @@ class HatCmsApp:
     self.page.window.height = 960
 
     self.field_controls = {}
+    self.field_definitions = {}
     self.local_site_server = None
     self.local_site_server_root = None
     self.local_site_url = ""
@@ -35,13 +37,21 @@ class HatCmsApp:
       hint_text="Defaults to ./site. You can point this at another Hugo site if needed.",
     )
 
+    _enabled_keys = {"event", "document"}
+    _ordered_keys = ["event", "document"] + [
+      k for k in ENTRY_DEFINITIONS if k not in _enabled_keys
+    ]
     self.entry_dropdown = ft.Dropdown(
       label="Content Type",
       width=320,
-      value="post",
+      value="event",
       options=[
-        ft.dropdown.Option(key=entry_key, text=entry["label"])
-        for entry_key, entry in ENTRY_DEFINITIONS.items()
+        ft.dropdown.Option(
+          key=k,
+          text=ENTRY_DEFINITIONS[k]["label"],
+          disabled=k not in _enabled_keys,
+        )
+        for k in _ordered_keys
       ],
       on_select=self.handle_entry_change,
     )
@@ -68,8 +78,22 @@ class HatCmsApp:
 
     self.form_column = ft.Column(spacing=12)
 
+    # Shared pickers (Wieting pattern): created once, live in page.overlay permanently.
+    self._picker_target_field = None
+    self._picker_mode = "date"  # "date" or "datetime"
+    self._date_picker = ft.DatePicker(
+      on_change=self._on_date_picker_change,
+      first_date=datetime(1990, 1, 1),
+      last_date=datetime(2100, 12, 31),
+    )
+    self._time_picker = ft.TimePicker(
+      on_change=self._on_time_picker_change,
+    )
+
     self.build_form()
     self.page.add(self.build_layout())
+    self.page.overlay.append(self._date_picker)
+    self.page.overlay.append(self._time_picker)
     self.refresh_preview()
 
   def build_layout(self):
@@ -119,6 +143,7 @@ class HatCmsApp:
 
   def build_form(self):
     self.field_controls = {}
+    self.field_definitions = {}
     entry = ENTRY_DEFINITIONS[self.entry_dropdown.value]
     controls = [
       ft.Text(
@@ -146,6 +171,7 @@ class HatCmsApp:
     for field in entry["fields"]:
       control, value_control = self.make_control(field)
       self.field_controls[field["name"]] = value_control
+      self.field_definitions[field["name"]] = field
       controls.append(control)
 
     has_markdown = any(field["type"] == "markdown" for field in entry["fields"])
@@ -173,9 +199,61 @@ class HatCmsApp:
         "Select PDF",
         on_click=lambda _event, field_name=field["name"]: self.handle_pick_pdf(field_name),
       )
-      wrapper = ft.Column(
+      wrapper = ft.Row(
         controls=[value_field, pick_button],
+        spacing=12,
+        vertical_alignment=ft.CrossAxisAlignment.END,
+        expand=True,
+      )
+      return wrapper, value_field
+
+    if field["type"] == "date":
+      default_value = str(field.get("default") or date.today().isoformat())
+      value_field = ft.TextField(
+        label=field["label"],
+        hint_text=field.get("hint"),
+        value=default_value,
+        expand=True,
+        read_only=True,
+      )
+      pick_button = ft.OutlinedButton(
+        "Pick Date",
+        on_click=lambda _event, field_name=field["name"]: self.handle_pick_date(field_name),
+      )
+      wrapper = ft.Row(
+        controls=[value_field, pick_button],
+        spacing=12,
+        vertical_alignment=ft.CrossAxisAlignment.END,
+        expand=True,
+      )
+      return wrapper, value_field
+
+    if field["type"] == "datetime":
+      default_value = str(field.get("default") or self.current_datetime_iso())
+      value_field = ft.TextField(
+        label=field["label"],
+        hint_text=field.get("hint"),
+        value=default_value,
+        expand=True,
+        read_only=True,
+      )
+      pick_button = ft.OutlinedButton(
+        "Pick Date",
+        on_click=lambda _event, field_name=field["name"]: self.handle_pick_datetime(field_name),
+      )
+      time_button = ft.OutlinedButton(
+        "Pick Time",
+        on_click=lambda _event, field_name=field["name"]: self.handle_pick_datetime_time(field_name),
+      )
+      now_button = ft.TextButton(
+        "Now",
+        on_click=lambda _event, field_name=field["name"]: self.handle_set_datetime_now(field_name),
+      )
+      wrapper = ft.Row(
+        controls=[value_field, pick_button, time_button, now_button],
         spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.END,
+        expand=True,
       )
       return wrapper, value_field
 
@@ -211,17 +289,21 @@ class HatCmsApp:
       if entry.get("pdf_embed"):
         pdf_target_path = build_pdf_asset_path(PROJECT_ROOT, self.site_root_field.value, self.entry_dropdown.value, values)
         selected_pdf = values.get("pdf_file", "").strip()
-        source_text = selected_pdf if selected_pdf else "No PDF selected"
+        if selected_pdf:
+          self.set_status(
+            f"Source PDF: {selected_pdf} | Target file: {target_path} | Embedded PDF: {pdf_target_path}",
+            ft.Colors.BLUE_700,
+          )
+        else:
+          self.set_status("No PDF selected yet.", ft.Colors.BLUE_700)
         self.preview_field.value = ""
-        self.set_status(
-          f"Source PDF: {source_text} | Target file: {target_path} | Embedded PDF: {pdf_target_path}",
-          ft.Colors.BLUE_700,
-        )
       elif any(field["type"] == "pdf" for field in entry["fields"]):
         selected_pdf = values.get("pdf_file", "").strip()
-        source_text = selected_pdf if selected_pdf else "No PDF selected"
+        if selected_pdf:
+          self.set_status(f"Source PDF: {selected_pdf} | Target file: {target_path}", ft.Colors.BLUE_700)
+        else:
+          self.set_status("No PDF selected yet.", ft.Colors.BLUE_700)
         self.preview_field.value = ""
-        self.set_status(f"Source PDF: {source_text} | Target file: {target_path}", ft.Colors.BLUE_700)
       else:
         self.preview_field.value = render_markdown(self.entry_dropdown.value, values)
         self.set_status(f"Target file: {target_path}", ft.Colors.BLUE_700)
@@ -320,12 +402,113 @@ class HatCmsApp:
 
     self.page.update()
 
+  def handle_pick_date(self, field_name):
+    control = self.field_controls.get(field_name)
+    if not isinstance(control, ft.TextField):
+      return
+    try:
+      self._date_picker.value = datetime.strptime((control.value or "").strip(), "%Y-%m-%d")
+    except ValueError:
+      self._date_picker.value = datetime.today()
+    self._picker_target_field = field_name
+    self._picker_mode = "date"
+    self._date_picker.open = True
+    self.page.update()
+
+  def current_datetime_iso(self):
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
+
+  def parse_datetime_value(self, raw_value):
+    text = (raw_value or "").strip()
+    if text:
+      try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+          parsed = parsed.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        return parsed.replace(microsecond=0)
+      except ValueError:
+        pass
+
+    return datetime.now().astimezone().replace(microsecond=0)
+
+  def handle_set_datetime_now(self, field_name):
+    control = self.field_controls.get(field_name)
+    if not isinstance(control, ft.TextField):
+      return
+
+    control.value = self.current_datetime_iso()
+    self.refresh_preview()
+
+  def handle_pick_datetime(self, field_name):
+    control = self.field_controls.get(field_name)
+    if not isinstance(control, ft.TextField):
+      return
+    current_dt = self.parse_datetime_value(control.value)
+    self._date_picker.value = datetime(current_dt.year, current_dt.month, current_dt.day)
+    self._picker_target_field = field_name
+    self._picker_mode = "datetime"
+    self._date_picker.open = True
+    self.page.update()
+
+  def handle_pick_datetime_time(self, field_name):
+    control = self.field_controls.get(field_name)
+    if not isinstance(control, ft.TextField):
+      return
+    current_dt = self.parse_datetime_value(control.value)
+    self._time_picker.value = dt_time(
+      hour=current_dt.hour,
+      minute=current_dt.minute,
+      second=current_dt.second,
+    )
+    self._picker_target_field = field_name
+    self._time_picker.open = True
+    self.page.update()
+
+  def _on_date_picker_change(self, _event):
+    if self._date_picker.value is None or self._picker_target_field is None:
+      return
+    control = self.field_controls.get(self._picker_target_field)
+    if not isinstance(control, ft.TextField):
+      return
+    selected = self._date_picker.value
+    selected_date = selected.date() if isinstance(selected, datetime) else selected
+    if self._picker_mode == "date":
+      control.value = selected_date.isoformat()
+    else:
+      current_dt = self.parse_datetime_value(control.value)
+      updated = current_dt.replace(year=selected_date.year, month=selected_date.month, day=selected_date.day)
+      control.value = updated.isoformat()
+    self.refresh_preview()
+
+  def _on_time_picker_change(self, _event):
+    if self._time_picker.value is None or self._picker_target_field is None:
+      return
+    control = self.field_controls.get(self._picker_target_field)
+    if not isinstance(control, ft.TextField):
+      return
+    selected = self._time_picker.value
+    selected_time = selected.time() if isinstance(selected, datetime) else selected
+    current_dt = self.parse_datetime_value(control.value)
+    updated = current_dt.replace(
+      hour=selected_time.hour,
+      minute=selected_time.minute,
+      second=selected_time.second,
+    )
+    control.value = updated.isoformat()
+    self.refresh_preview()
+
   def handle_clear(self, _event):
-    for control in self.field_controls.values():
+    for field_name, control in self.field_controls.items():
+      field = self.field_definitions.get(field_name, {})
       if isinstance(control, ft.Checkbox):
         control.value = False
       else:
-        control.value = ""
+        if field.get("type") == "date":
+          control.value = date.today().isoformat()
+        elif field.get("type") == "datetime":
+          control.value = self.current_datetime_iso()
+        else:
+          control.value = ""
 
     self.refresh_preview()
 

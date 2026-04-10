@@ -6,19 +6,19 @@ import yaml
 
 ENTRY_DEFINITIONS = {
   "event": {
-    "label": "Event",
+    "label": "Event (Markdown)",
     "mode": "folder",
     "folder": "content/event",
     "filename_mode": "dated_slug",
     "date_field": "publishDate",
     "fields": [
       {"name": "title", "label": "Title", "type": "string", "required": True},
-      {"name": "filename_slug", "label": "Filename Slug", "type": "string", "required": False, "store": False, "hint": "Optional override for the generated filename slug."},
       {"name": "publishDate", "label": "Publish Date", "type": "datetime", "required": True, "hint": "Example: 2026-04-08T10:30:00-05:00"},
       {"name": "location", "label": "Location", "type": "string", "required": False},
       {"name": "expiryDate", "label": "Expiry Date", "type": "date", "required": False, "hint": "Example: 2026-12-31"},
-      {"name": "draft", "label": "Draft", "type": "boolean", "required": False, "default": False, "always_write": True},
       {"name": "body", "label": "Body", "type": "markdown", "required": False, "store": False},
+      {"name": "filename_slug", "label": "Filename Slug", "type": "string", "required": False, "store": False, "hint": "Optional override for the generated filename slug."},
+      {"name": "draft", "label": "Draft", "type": "boolean", "required": False, "default": False, "always_write": True},
     ],
   },
   "post": {
@@ -57,7 +57,7 @@ ENTRY_DEFINITIONS = {
     ],
   },
   "document": {
-    "label": "Document",
+    "label": "Document (PDF)",
     "mode": "folder",
     "folder": "content/document",
     "filename_mode": "dated_slug",
@@ -65,11 +65,11 @@ ENTRY_DEFINITIONS = {
     "pdf_embed": True,
     "pdf_asset_folder": "pdfs",
     "fields": [
-      {"name": "title", "label": "Title", "type": "string", "required": True},
-      {"name": "filename_slug", "label": "Filename Slug", "type": "string", "required": False, "store": False},
+      {"name": "title", "label": "Title", "type": "string", "required": True, "hint": "Don't include the date — it's prepended automatically."},
       {"name": "date", "label": "Date", "type": "date", "required": True, "hint": "Example: 2026-04-08"},
-      {"name": "draft", "label": "Draft", "type": "boolean", "required": False, "default": False, "always_write": True},
       {"name": "pdf_file", "label": "PDF File", "type": "pdf", "required": True, "store": False, "hint": "Select a local PDF file."},
+      {"name": "filename_slug", "label": "Filename Slug", "type": "string", "required": False, "store": False},
+      {"name": "draft", "label": "Draft", "type": "boolean", "required": False, "default": False, "always_write": True},
     ],
   },
   "education": {
@@ -248,7 +248,7 @@ def build_pdf_asset_path(project_root, site_root_value, entry_key, values):
   site_root = resolve_site_root(project_root, site_root_value)
   target_path = build_target_path(project_root, site_root_value, entry_key, values)
   pdf_folder = entry.get("pdf_asset_folder", "pdfs")
-  return site_root / pdf_folder / f"{target_path.stem}.pdf"
+  return site_root / "static" / pdf_folder / f"{target_path.stem}.pdf"
 
 
 def render_markdown(entry_key, values):

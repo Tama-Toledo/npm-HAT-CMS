@@ -90,19 +90,26 @@ That lets you use this repository as a local editor even if the real site source
 
 ## Supported Content Types
 
-The local CMS currently supports these content targets:
+The local CMS currently has full UI support for:
 
-- Events
-- Posts
-- Plans
-- Documents
-- Education
-- Let's Moove page
-- About page
-- Calendar page
-- Contact page
+- **Event (Markdown)** - dated folder-based entries with support for publish date, location, expiry date, and markdown body
+- **Document (PDF)** - dated folder-based entries with embedded PDF support
 
-Folder-based content types generate filenames automatically from title and date data. Fixed pages write directly to their known markdown file path.
+Other content types (Posts, Plans, Education, Let's Moove page, About page, Calendar page, Contact page) are defined in `cms_core.py` but are disabled in the CMS UI pending full implementation.
+
+### Content Type Details
+
+**Event (Markdown)**
+- Fields: Title, Publish Date, Location, Expiry Date, Body, Filename Slug, Draft
+- Filenames: auto-generated as `YYYY-MM-DD_slug.md` with date prefix
+- Output: `site/content/event/`
+
+**Document (PDF)**
+- Fields: Title, Date, PDF File, Filename Slug, Draft
+- Filenames: auto-generated as `YYYY-MM-DD_slug.md` and corresponding `YYYY-MM-DD_slug.pdf`
+- Output: `site/content/document/` (markdown) and `site/static/pdfs/` (PDF)
+- The date is automatically prepended to the filename, so titles should not include the date.
+- PDFs are embedded in the markdown via `<embed>` tag
 
 ## Files
 
@@ -111,7 +118,34 @@ Folder-based content types generate filenames automatically from title and date 
 - `run.sh` - local launcher
 - `python-requirements.txt` - Python dependencies for the CMS app
 - `site/` - Hugo site source
+- `site/static/pdfs/` - PDF files for document embedding
+- `site/static/webfonts/` - Font Awesome webfonts
 - `dist/` - generated static output after build and the artifact Amplify publishes
+
+## Features
+
+### Date and Time Pickers
+
+Event and Document entries with date/time fields use native Flet date and time picker controls:
+- Date fields open a `DatePicker` dialog with calendar UI
+- DateTime fields provide both date and time picker buttons
+- Time fields open a `TimePicker` dialog
+- Pickers are shared as instance variables and added to the page overlay for efficiency
+
+### PDF Embedding
+
+Document entries support embedded PDF viewing:
+- Select a local PDF file via the file picker
+- The PDF is copied to `site/static/pdfs/` with automatic naming
+- Markdown content embeds the PDF via `<embed>` tag pointing to the relative path
+- On build, PDFs are included in `dist/pdfs/` for serving
+
+### Font Awesome Icons
+
+The site includes Font Awesome 5.13.0 webfonts:
+- Webfont files: `site/static/webfonts/fa-*.{eot,ttf,woff,woff2}`
+- CSS: `site/assets/css/fontawesome-free-5.13.0-web-all.min.css`
+- Icons can be used in layouts and content via `<i class="fas fa-icon-name">` markup
 
 ## Test
 
