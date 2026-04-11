@@ -2,21 +2,48 @@
 
 This repository is intended to deploy through AWS Amplify using the source-driven flow described in `DEPLOYMENT_FLOW.md`.
 
+## What You Are Deploying
+
+Amplify should deploy this repository from source, not from a manually uploaded `dist/` folder.
+
+The hosted build is:
+
+- install Node dependencies with `npm ci`
+- run `npm run build` from the repository root
+- publish the generated `dist/` directory
+
+The local Python CMS is not part of the hosted app. It only edits source files in this repository.
+
 ## Important Structure Note
 
-The local CMS is a Python app, but its dependency file is named `python-requirements.txt`, not `requirements.txt`. That avoids confusing AWS Amplify's app detection and keeps this repository aligned with its Node plus Hugo build path.
+The local CMS dependency file is named `python-requirements.txt`, not `requirements.txt`. That avoids confusing Amplify's app detection and keeps the hosted build on the validated Node plus Hugo path.
 
 ## Prerequisites
 
 - AWS account with Amplify access
 - GitHub repository connected to this project
-- A branch to use as the deployment source, typically `main`
+- A deployment branch, typically `main`
+- Node 20 compatible build environment
 
-## Amplify Build Configuration
+## Exact Amplify Settings
 
-This repository includes [amplify.yml](/Users/mark/GitHub/npm-HAT-CMS/amplify.yml) at the root.
+When you create the Amplify app, these are the settings that should match this repository:
 
-Amplify should use that file as-is:
+- App type: Git-based deploy from GitHub
+- Repository root: `/`
+- Branch: your deployment branch, typically `main`
+- Monorepo setting: off
+- Build specification: use the repository's root `amplify.yml`
+- Pre-build command: `npm ci`
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Environment variables required for hosted build: none
+
+Do not point Amplify at `site/` as the app root, and do not configure the publish directory as `site`, `public`, or `site/dist`.
+
+## Repository Build Specification
+
+This repository already includes [amplify.yml](/Users/mark/GitHub/npm-HAT-CMS/amplify.yml):
 
 ```yaml
 version: 1
@@ -37,15 +64,20 @@ frontend:
       - node_modules/**
 ```
 
+Amplify should use that file as-is.
+
 ## Deployment Steps
 
-1. Push this repository to GitHub.
-2. In AWS Amplify, create a new hosted web app.
-3. Connect the GitHub repository and choose the deployment branch.
-4. Keep the root-level `amplify.yml` build settings.
-5. Save and deploy.
+1. Push the current repository state to GitHub.
+2. In AWS Amplify, choose to create a new app from a Git provider.
+3. Authorize GitHub and select this repository.
+4. Select the deployment branch.
+5. Confirm Amplify detected the root-level `amplify.yml`.
+6. Verify the build settings match the values listed above.
+7. Start the initial build.
+8. After the first successful deploy, add any custom domain inside Amplify.
 
-Amplify will then rebuild and publish on every push to the connected branch.
+Amplify will rebuild and publish on every push to the connected branch.
 
 ## What Amplify Publishes
 
@@ -61,14 +93,39 @@ That build does two things:
 Use the same commands Amplify relies on:
 
 ```bash
-npm install
+rm -rf node_modules dist
+npm ci
 npm run build
 ```
 
-If those succeed locally, Amplify should be using the same source path and output contract.
+That clean build path has already been validated in this repository.
+
+## Build Log Checks
+
+On the first Amplify deployment, verify these points in the build log:
+
+- Amplify is running from the repository root
+- `npm ci` runs successfully
+- `npm run build` completes successfully
+- Hugo writes the generated site to `dist`
+- Amplify publishes `dist`
+
+If the build log shows an older Node runtime, switch the Amplify build environment to a Node 20 compatible image before retrying.
+
+## What Does Not Belong In Amplify
+
+These local-only files should not be configured as hosted build inputs or environment variables unless you intentionally extend the hosted app later:
+
+- `.env`
+- `google-service-account.json`
+- `.venv/`
+- `dist/` checked in manually
+
+The Google Calendar integration is only used by the local CMS when saving events. It is not needed for the static site build.
 
 ## Notes
 
-- The local CMS does not deploy to AWS. It only edits source files.
+- The local CMS does not deploy to AWS.
 - `dist/` is generated output and should not be treated as hand-edited content.
 - If you later add a custom domain, that is configured in Amplify and DNS, not in the CMS.
+- The local executable-bit workaround you used for `node_modules/.bin` on macOS is not expected to be part of the Amplify setup.

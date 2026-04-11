@@ -24,7 +24,7 @@ The new approach is local-first:
 
 ## Prerequisites
 
-- Node.js 12+
+- Node.js 20+
 - Python 3.9+
 - npm dependencies installed with `npm install`
 
