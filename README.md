@@ -121,6 +121,29 @@ Other content types (Plans, Education, Let's Moove page, About page, Calendar pa
 - The date is automatically prepended to the filename, so titles should not include the date.
 - PDFs are embedded in the markdown via `<embed>` tag
 
+## Analytics
+
+The production site at `https://hat.tamatoledo.org` uses its own GA4 Web
+stream, `Tama-Toledo HAT production website`, with Measurement ID
+`G-DETSMQP0PB` (stream ID `16297770478`). The ID is configured in
+`site/config.toml` under `[services.googleAnalytics]`.
+
+The shared `head_custom.html` partial uses Hugo's built-in Google Analytics
+template only in the production environment. The former Matomo site 9 tracker
+has been removed; the PDF.js and Pagefind integrations are unchanged. Do not
+add a second Google tag or reuse Wieting's or the personal blog's ID.
+
+Regular `hugo server` previews use the development environment and omit GA.
+The npm scripts that invoke plain Hugo, including the watch and draft-preview
+scripts, default to production; set `HUGO_ENVIRONMENT=development` when using
+those scripts if you want an untracked preview.
+
+After committing and pushing these source changes, AWS Amplify rebuilds the
+site. Verify the live tag and visits in the HAT property's Realtime report.
+Reload pages opened before deployment, and check browser blocking if visits
+do not appear. Review applicable privacy and consent requirements before
+publication.
+
 ## Files
 
 - `main.py` - Flet desktop-style CMS application
